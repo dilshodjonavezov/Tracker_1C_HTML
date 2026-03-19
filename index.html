@@ -56,8 +56,36 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 
 
 const parsed = points.map(p => [parseFloat(p.latitude), parseFloat(p.longitude)]);
 
+function haversine(a, b) {
+  const R = 6371, dLat = (b[0]-a[0])*Math.PI/180, dLon = (b[1]-a[1])*Math.PI/180;
+  const x = Math.sin(dLat/2)**2 + Math.cos(a[0]*Math.PI/180)*Math.cos(b[0]*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
+}
+
+function splitByDistance(coords, maxJumpKm) {
+  if (!coords.length) return [];
+
+  const segments = [[coords[0]]];
+
+  for (let i = 1; i < coords.length; i++) {
+    const prev = coords[i - 1];
+    const current = coords[i];
+
+    if (haversine(prev, current) > maxJumpKm) {
+      segments.push([current]);
+    } else {
+      segments[segments.length - 1].push(current);
+    }
+  }
+
+  return segments.filter(segment => segment.length > 1);
+}
+
 // Polyline
-L.polyline(parsed, { color: '#00e5ff', weight: 2.5, opacity: 0.8, dashArray: '6,4' }).addTo(map);
+const routeSegments = splitByDistance(parsed, 10);
+routeSegments.forEach(segment => {
+  L.polyline(segment, { color: '#00e5ff', weight: 2.5, opacity: 0.8, dashArray: '6,4' }).addTo(map);
+});
 
 // Start marker
 function makeIcon(color, size) {
@@ -77,11 +105,6 @@ L.marker(parsed[parsed.length-1], { icon: makeIcon('#ff4444', 14) })
   .addTo(map);
 
 // Stats
-function haversine(a, b) {
-  const R = 6371, dLat = (b[0]-a[0])*Math.PI/180, dLon = (b[1]-a[1])*Math.PI/180;
-  const x = Math.sin(dLat/2)**2 + Math.cos(a[0]*Math.PI/180)*Math.cos(b[0]*Math.PI/180)*Math.sin(dLon/2)**2;
-  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
-}
 let dist = 0;
 for (let i = 1; i < parsed.length; i++) dist += haversine(parsed[i-1], parsed[i]);
 
